@@ -1,0 +1,77 @@
+#container
+:coffee
+  camera = undefined
+  controls = undefined
+  scene = undefined
+  renderer = undefined
+  
+  bill = undefined
+  centre = undefined
+
+  init = ->
+    camera = new THREE.PerspectiveCamera(10, window.innerWidth / window.innerHeight, 1, 500)
+    scene = new THREE.Scene()
+    controls = new THREE.OrbitControls(camera)
+    controls.addEventListener "change", render
+    loader = new THREE.PLYLoader()
+    loader.load "#{params[:filename] || 'Vanga_12pc.ply'}", (geometry) ->
+      centre = geometry.center()
+      cameraLookat = new THREE.Vector3(-centre.x, -centre.y, -centre.z)
+      
+      camera.lookAt cameraLookat
+      controls.target.copy cameraLookat
+            
+      material = new THREE.MeshBasicMaterial(
+        vertexColors: THREE.VertexColors
+        side: THREE.DoubleSide
+      )
+            
+      bill = new THREE.Mesh(geometry, material)
+      scene.add bill
+
+
+    # renderer
+    renderer = new THREE.WebGLRenderer(antialias: false)
+    renderer.setClearColor 0xcccccc
+    renderer.setSize window.innerWidth, window.innerHeight
+    
+    container = document.getElementById("container")
+    container.appendChild renderer.domElement
+
+    renderer.domElement.addEventListener "mousedown", onDocumentMouseDown, false
+    window.addEventListener "resize", onWindowResize, false
+    
+  onWindowResize = ->
+    camera.aspect = window.innerWidth / window.innerHeight
+    camera.updateProjectionMatrix()
+    renderer.setSize window.innerWidth, window.innerHeight
+    render()
+    
+  onDocumentMouseDown = ->
+    vector = new THREE.Vector3()
+    vector.set (event.clientX / window.innerWidth) * 2 - 1, -(event.clientY / window.innerHeight) * 2 + 1, 1
+    vector.unproject camera
+    
+    raycaster = new THREE.Raycaster()
+    raycaster.ray.set camera.position, vector.sub(camera.position).normalize()
+    
+    intersects = raycaster.intersectObject(bill)
+    
+    if intersects.length > 0
+      particle = new THREE.Sprite(new THREE.SpriteMaterial(color: 0xff0000))
+      particle.position.copy intersects[0].point
+      particle.scale.x = particle.scale.y = 1
+      scene.add particle
+      
+      console.log "x: " + (intersects[0].point.x - centre.x) + ", y: " + (intersects[0].point.y - centre.y) + ", z:" + (intersects[0].point.z - centre.z)
+    
+  render = ->
+    renderer.render scene, camera
+    
+  animate = ->
+    requestAnimationFrame animate
+    controls.update()
+    render()
+
+  init()
+  animate()
